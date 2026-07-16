@@ -1,0 +1,48 @@
+{
+  "name": "division-agent-bw",
+  "author": "yangtheman",
+  "version": "1.1.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "@rebble/clay": "^1.0.10"
+  },
+  "pebble": {
+    "displayName": "Division Agent Classic",
+    "uuid": "db0d1806-1c70-44ce-86e4-a3ab77ab68df",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "diorite",
+      "chalk"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "capabilities": [
+      "location",
+      "health",
+      "configurable"
+    ],
+    "messageKeys": [
+      "TemperatureUnit",
+      "UsePhoneLocation",
+      "CityName",
+      "WeatherTemp",
+      "WeatherUnit"
+    ],
+    "resources": {
+      "media": [
+        {
+          "type": "font",
+          "name": "FONT_DSEG7_22",
+          "file": "fonts/DSEG7Classic-BoldItalic.ttf",
+          "characterRegex": "[0-9:]",
+          "pixelHeight": 22
+        }
+      ]
+    }
+  }
+}

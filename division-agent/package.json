@@ -1,0 +1,40 @@
+{
+  "name": "division-face",
+  "author": "yangtheman",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "@moddable/pebbleproxy": "^0.1.8",
+    "@rebble/clay": "^1.0.10"
+  },
+  "pebble": {
+    "displayName": "Division Agent",
+    "uuid": "8df68a8e-850c-47ff-8137-9e34b4d3e674",
+    "projectType": "moddable",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery",
+      "gabbro"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "capabilities": [
+      "location",
+      "health",
+      "configurable"
+    ],
+    "messageKeys": [
+      "TemperatureUnit",
+      "UsePhoneLocation",
+      "CityName"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

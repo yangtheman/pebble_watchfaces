@@ -1,0 +1,13 @@
+.DS_Store
+
+.claude/
+.venv/
+__pycache__/
+
+# Pebble build artifacts — the waf lock file embeds the full shell
+# environment (API keys!), never commit it
+build/
+.lock-waf_darwin_build
+
+# Node dependencies (restored via package.json)
+node_modules/
