@@ -21,10 +21,16 @@ Features:
 
 Built with Pebble's new Alloy (JavaScript) SDK.
 
-## Release notes (v1.0.0)
+## Release notes (v1.0.1)
 
-Initial release: time with seconds, date, steps, battery, weather with
-configurable units and location.
+Fixed a display bug where the ACTIVATED status and step count could be
+clipped by the tick ring for longer strings (e.g. higher step counts) —
+they now stay clear of the ring on every screen size. Weather now refreshes
+immediately on launch and retries automatically instead of waiting on the
+next scheduled update.
+
+(v1.0.0: initial release — time with seconds, date, steps, battery, weather
+with configurable units and location.)
 
 ## Files to upload
 

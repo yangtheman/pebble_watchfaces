@@ -75,27 +75,86 @@ static void draw_sun(GContext *ctx, GPoint p) {
     graphics_draw_line(ctx, radial_point(p, 5, i * 45), radial_point(p, 8, i * 45));
 }
 
+// In division-agent's drawEmblem(), the 3 stroked lines per wing overlap
+// into a solid wedge — but that relies on line width being large relative
+// to line spacing, and at this ring's smaller scale, width only rounds to
+// 1 (too thin, wings stay separate spikes) or 2 (too thick, wings bleed
+// into the ring). A traced silhouette of the exact merged shape hits the
+// same wall from the other direction: once scaled down and rounded to this
+// platform's integer coordinates, distinct points collapse together and
+// the polygon self-intersects, which gpath_draw_filled renders as garbage.
+// Filling a single simple (non-self-intersecting) wedge per wing side —
+// the same 4 corner points, minus the middle line's inner detail — is the
+// version of that shape that survives small-scale integer rounding.
+static const GPathInfo WING_R_PATH_INFO = {
+  .num_points = 4,
+  .points = (GPoint[]) { {1, 1}, {9, -6}, {6, 2}, {1, 5} }
+};
+static const GPathInfo WING_L_PATH_INFO = {
+  .num_points = 4,
+  .points = (GPoint[]) { {-1, 1}, {-9, -6}, {-6, 2}, {-1, 5} }
+};
+
 static void draw_emblem(GContext *ctx, GPoint c) {
   graphics_context_set_stroke_color(ctx, ACCENT_COLOR);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_circle(ctx, c, 12);
 
-  // stylized SHD phoenix: body, head, fanned wings
   graphics_context_set_stroke_color(ctx, GColorWhite);
-  graphics_draw_line(ctx, GPoint(c.x, c.y - 1), GPoint(c.x, c.y + 7));
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_circle(ctx, GPoint(c.x, c.y - 4), 1);
-  graphics_context_set_stroke_width(ctx, 1);
-  for (int s = -1; s <= 1; s += 2) {
-    graphics_draw_line(ctx, GPoint(c.x + s * 2, c.y + 1), GPoint(c.x + s * 9, c.y - 5));
-    graphics_draw_line(ctx, GPoint(c.x + s * 2, c.y + 3), GPoint(c.x + s * 8, c.y - 1));
-    graphics_draw_line(ctx, GPoint(c.x + s * 2, c.y + 5), GPoint(c.x + s * 6, c.y + 2));
-  }
+  graphics_draw_line(ctx, GPoint(c.x, c.y - 1), GPoint(c.x, c.y + 6));
+
+  GPath *wing_r = gpath_create(&WING_R_PATH_INFO);
+  gpath_move_to(wing_r, c);
+  gpath_draw_filled(ctx, wing_r);
+  gpath_destroy(wing_r);
+
+  GPath *wing_l = gpath_create(&WING_L_PATH_INFO);
+  gpath_move_to(wing_l, c);
+  gpath_draw_filled(ctx, wing_l);
+  gpath_destroy(wing_l);
 }
 
-static void draw_text_centered(GContext *ctx, const char *text, GFont font, int cx, int y, int h) {
-  graphics_draw_text(ctx, text, font, GRect(cx - 70, y, 140, h),
+static void draw_text_centered(GContext *ctx, const char *text, GFont font, int cx, int y, int h, int w) {
+  graphics_draw_text(ctx, text, font, GRect(cx - w / 2, y, w, h),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
+static int text_width(const char *text, GFont font) {
+  GSize size = graphics_text_layout_get_content_size(text, font, GRect(0, 0, 200, 30),
+                                                     GTextOverflowModeFill, GTextAlignmentLeft);
+  return size.w;
+}
+
+static int isqrt(int64_t v) {
+  if (v <= 0) return 0;
+  int64_t x = v, y = (x + 1) / 2;
+  while (y < x) { x = y; y = (x + v / x) / 2; }
+  return (int)x;
+}
+
+// Largest distance from center, along y, at which a chord of the given
+// half-width still clears the ring: the black face has radius r-9, and the
+// heavy hour ticks cut 2px further in than that, so keep a small buffer.
+static int max_dy_for_halfwidth(int r, int half_w) {
+  int safe_r = r - 13;
+  if (safe_r <= 0) return 0;
+  int64_t sr2 = (int64_t)safe_r * safe_r;
+  int64_t hw2 = (int64_t)half_w * half_w;
+  if (hw2 >= sr2) return 0;
+  return isqrt(sr2 - hw2);
+}
+
+// Width of the widest chord available at a given distance dy from center,
+// capped at `max_w` — used to size the ellipsis box once dy is finalized.
+static int width_at_dy(int r, int dy, int max_w) {
+  int safe_r = r - 13;
+  int64_t sr2 = (int64_t)safe_r * safe_r;
+  int64_t dy2 = (int64_t)dy * dy;
+  if (dy2 >= sr2) return 0;
+  int w = 2 * isqrt(sr2 - dy2);
+  return w < max_w ? w : max_w;
 }
 
 /* ---------- main draw ---------- */
@@ -141,23 +200,53 @@ static void layer_update(Layer *layer, GContext *ctx) {
   char time_str[12];
   snprintf(time_str, sizeof(time_str), "%d:%02d:%02d", hour, t->tm_min, t->tm_sec);
   graphics_context_set_text_color(ctx, ACCENT_COLOR);
-  draw_text_centered(ctx, time_str, s_time_font, c.x, c.y - 13, 26);
+  draw_text_centered(ctx, time_str, s_time_font, c.x, c.y - 13, 26, 140);
 
   // date 06/17/19
   char date_str[16];
   snprintf(date_str, sizeof(date_str), "%02d/%02d/%02d",
            t->tm_mon + 1, t->tm_mday, (t->tm_year + 1900) % 100);
   graphics_context_set_text_color(ctx, PALE_COLOR);
-  draw_text_centered(ctx, date_str, label_font, c.x, c.y + SY(16), 16);
+  draw_text_centered(ctx, date_str, label_font, c.x, c.y + SY(9), 16, 140);
 
+  // ACTIVATED and STEPS sit close to the ring, where the circle's chord is
+  // narrower than the ring-tuned 140px box; measure each string and pull it
+  // toward center (and shrink its box) just enough to clear the tick marks,
+  // rather than letting the outer glyphs get overdrawn by the ring. The
+  // 16px box is top-aligned but the glyphs only ink roughly its top third,
+  // so the point that actually has to clear the ring is dy + INK_H, not
+  // the box's full height — checking the full height starved the rows of
+  // room and pushed STEPS into ACTIVATED.
+  #define ROW_H 16
+  #define INK_H 6
   graphics_context_set_text_color(ctx, GColorWhite);
-  draw_text_centered(ctx, "ACTIVATED", label_font, c.x, c.y + SY(31), 16);
+  const char *activated_str = "ACTIVATED";
+  int activated_dy = SY(23);
+  int activated_half = text_width(activated_str, label_font) / 2 + 3;
+  int activated_max_dy = max_dy_for_halfwidth(r, activated_half) - INK_H;
+  if (activated_dy > activated_max_dy) activated_dy = activated_max_dy;
+  draw_text_centered(ctx, activated_str, label_font, c.x, c.y + activated_dy, ROW_H,
+                     width_at_dy(r, activated_dy + INK_H, 140));
 
   char steps_str[24] = "-- STEPS";
   HealthValue steps = health_service_sum_today(HealthMetricStepCount);
   if (steps >= 0)
     snprintf(steps_str, sizeof(steps_str), "%d STEPS", (int)steps);
-  draw_text_centered(ctx, steps_str, fonts_get_system_font(FONT_KEY_GOTHIC_14), c.x, c.y + SY(45), 16);
+  GFont steps_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+  int steps_dy = SY(36);
+  int steps_half = text_width(steps_str, steps_font) / 2 + 3;
+  int steps_max_dy = max_dy_for_halfwidth(r, steps_half) - INK_H;
+  if (steps_dy > steps_max_dy) steps_dy = steps_max_dy;
+  int steps_min_dy = activated_dy + SY(14);
+  if (steps_dy < steps_min_dy) steps_dy = steps_min_dy;
+  // the ring boundary wins over the from-ACTIVATED spacing floor: bumping
+  // up for spacing must not push the row back past where it still clears
+  // the ring, or width_at_dy below goes to 0 and the row vanishes entirely.
+  if (steps_dy > steps_max_dy) steps_dy = steps_max_dy;
+  draw_text_centered(ctx, steps_str, steps_font, c.x, c.y + steps_dy, ROW_H,
+                     width_at_dy(r, steps_dy + INK_H, 140));
+  #undef ROW_H
+  #undef INK_H
 
   #undef SY
 }

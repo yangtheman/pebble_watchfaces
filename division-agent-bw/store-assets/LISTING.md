@@ -21,11 +21,16 @@ Features:
 - Current temperature via Open-Meteo (no API key or account needed)
 - Settings page: Celsius/Fahrenheit, phone GPS or a manual "City, State" location
 
-## Release notes (v1.1.0)
+## Release notes (v1.1.1)
 
-Added Pebble Time Round support with the full orange color design. Pebble 2 /
-2 SE keep the monochrome look. (v1.0.0: initial release — time with seconds,
-date, steps, battery, weather with configurable units and location.)
+Fixed a display bug where the ACTIVATED status and step count could be
+clipped by the tick ring for longer strings (e.g. higher step counts) —
+they now stay clear of the ring on every screen size.
+
+(v1.1.0: added Pebble Time Round support with the full orange color design.
+Pebble 2 / 2 SE keep the monochrome look. v1.0.0: initial release — time
+with seconds, date, steps, battery, weather with configurable units and
+location.)
 
 ## Files to upload
 

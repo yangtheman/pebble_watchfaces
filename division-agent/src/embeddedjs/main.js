@@ -120,7 +120,7 @@ function refreshWeather() {
 async function geocodeCity(city) {
 	try {
 		const parts = city.split(",").map(s => s.trim());
-		const url = "http://geocoding-api.open-meteo.com/v1/search?count=10&name=" +
+		const url = "https://geocoding-api.open-meteo.com/v1/search?count=10&name=" +
 			encodeURIComponent(parts[0]);
 		const response = await fetch(url);
 		const data = await response.json();
@@ -142,7 +142,7 @@ async function geocodeCity(city) {
 
 async function fetchWeather(latitude, longitude) {
 	try {
-		let url = "http://api.open-meteo.com/v1/forecast?latitude=" + latitude +
+		let url = "https://api.open-meteo.com/v1/forecast?latitude=" + latitude +
 			"&longitude=" + longitude + "&current=temperature_2m";
 		if (settings.fahrenheit)
 			url += "&temperature_unit=fahrenheit";
@@ -222,6 +222,15 @@ function centerText(text, font, color, cx, y) {
 		Math.round(cx - render.getTextWidth(text, font) / 2), y);
 }
 
+// Largest distance from center, along y, at which a chord of the given
+// half-width still clears the ring: the black face has radius R-13, and the
+// heavy hour ticks cut 3px further in than that, so keep a small buffer.
+function maxDyForHalfWidth(R, halfWidth) {
+	const safeR = R - 18;
+	if (safeR <= halfWidth) return 0;
+	return Math.sqrt(safeR * safeR - halfWidth * halfWidth);
+}
+
 /* ---------- main draw ---------- */
 
 function draw() {
@@ -264,10 +273,19 @@ function draw() {
 	const dateStr = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}/${String(now.getFullYear() % 100).padStart(2, "0")}`;
 	centerText(dateStr, dateFont, paleOrange, cx, cy + 10);
 
-	centerText("ACTIVATED", statusFont, white, cx, cy + 32);
+	// ACTIVATED and STEPS sit close to the ring, where the circle's chord is
+	// narrower than these rows' natural spacing; measure each string and pull
+	// it toward center just enough to clear the tick marks, rather than
+	// letting the outer glyphs get overdrawn by the ring.
+	const activatedHalf = render.getTextWidth("ACTIVATED", statusFont) / 2 + 3;
+	const activatedDy = Math.min(32, maxDyForHalfWidth(R, activatedHalf));
+	centerText("ACTIVATED", statusFont, white, cx, cy + activatedDy);
 
 	const stepsText = steps >= 0 ? `${steps} STEPS` : "-- STEPS";
-	centerText(stepsText, stepsFont, white, cx, cy + 56);
+	const stepsHalf = render.getTextWidth(stepsText, stepsFont) / 2 + 3;
+	const stepsMinDy = activatedDy + statusFont.height + 4;
+	const stepsDy = Math.max(stepsMinDy, Math.min(56, maxDyForHalfWidth(R, stepsHalf)));
+	centerText(stepsText, stepsFont, white, cx, cy + stepsDy);
 
 	render.end();
 }
@@ -277,7 +295,14 @@ function draw() {
 watch.addEventListener("secondchange", e => {
 	if (steps < 0 || e.date.getSeconds() % 30 === 0)
 		refreshSteps();
+	// Refresh every 30 minutes, and retry every minute until the first fetch
+	// succeeds (weather starts null and previously only refreshed on
+	// hourchange, so it could sit on the placeholder "--C"/"--F" for up to an
+	// hour after launch and never retry a failed fetch).
+	if (e.date.getSeconds() === 0 && (!weather || e.date.getMinutes() % 30 === 0))
+		refreshWeather();
 	draw();
 });
-watch.addEventListener("hourchange", refreshWeather);
 watch.addEventListener("resize", draw);
+
+refreshWeather();
